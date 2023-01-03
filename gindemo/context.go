@@ -13,6 +13,11 @@ type Context struct {
 	Writer  http.ResponseWriter
 	Request *http.Request
 	engine  *Engine
+
+	// 添加中间件.
+	handlers []HandlerFunc
+	// 中间件的索引
+	index int
 }
 
 // HandlerFunc 这个是为了使用context进行处理.
@@ -24,6 +29,17 @@ func newContext(w http.ResponseWriter, req *http.Request) *Context {
 	return &Context{
 		Writer:  w,
 		Request: req,
+		index:   -1,
+	}
+}
+
+// Next 这个是整个责任链的核心方法.每当这个方法被调用,就执行下一个中间件函数.
+func (c *Context) Next() {
+	c.index++
+	for c.index < len(c.handlers) {
+		// 执行下一个中间件函数
+		c.handlers[c.index](c)
+		c.index++
 	}
 }
 

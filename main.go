@@ -13,5 +13,10 @@ func main() {
 	//gindemo.TestGroup()
 
 	// 4.测试Context
-	gindemo.TestContext()
+	//gindemo.TestContext()
+
+	// 5.测试middle
+	gindemo.TestMiddler()
+
 }
+

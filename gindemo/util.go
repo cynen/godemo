@@ -1,5 +1,10 @@
 package gindemo
 
+import (
+	"log"
+	"time"
+)
+
 func resolveAddress(addr []string) string {
 	switch len(addr) {
 	case 0:
@@ -71,4 +76,23 @@ func TestContext() {
 	})
 
 	engine.Run(":8888")
+}
+
+func TestMiddler() {
+	engine := Default()
+	engine.Use(Timer)
+	engine.Get("/ping", func(ctx *Context) {
+		ctx.JSON(200, H{
+			"message": "OK",
+		})
+	})
+	engine.Run(":8888")
+}
+
+// Timer 自定义一个中间件,用于记录请求响应时间.
+func Timer(ctx *Context) {
+	t := time.Now()
+	ctx.Next()
+	log.Printf("use time: %v\n", time.Since(t))
+	//fmt.Println("use time : ", time.Since(t))
 }

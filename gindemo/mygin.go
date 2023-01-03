@@ -2,6 +2,7 @@ package gindemo
 
 import (
 	"net/http"
+	"strings"
 )
 
 // Engine 定义一个 Web引擎.
@@ -11,6 +12,7 @@ type Engine struct {
 	// router map[string]http.HandlerFunc
 	router map[string]HandlerFunc
 	RouterGroup
+	groups []*RouterGroup
 }
 
 // Default 创建默认Web引擎的方法.
@@ -28,6 +30,7 @@ func New() *Engine {
 		},
 	}
 	engine.RouterGroup.engine = engine
+	engine.groups = append(engine.groups, &engine.RouterGroup)
 	return engine
 }
 
@@ -47,23 +50,49 @@ func (engine *Engine) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	//w.Write([]byte("hello"))
 
 	// 2.标准Web服务,添加handler
-	//key := req.Method + "-" + req.RequestURI
-	//if handler, ok := engine.router[key]; ok {
-	//	handler(w, req)
-	//} else {
-	//	http.NotFound(w, req)
-	//}
+	/*
+		key := req.Method + "-" + req.RequestURI
+		if handler, ok := engine.router[key]; ok {
+			handler(w, req)
+		} else {
+			http.NotFound(w, req)
+		}
+	*/
 
 	// 3.修改为context
+	/*
+		context := newContext(w, req)
+		context.engine = engine
+		key := req.Method + "-" + req.RequestURI
+		if handler, ok := engine.router[key]; ok {
+			handler(context)
+		} else {
+			http.NotFound(w, req)
+		}
+	*/
+
+	// 4.添加中间件.
 	context := newContext(w, req)
 	context.engine = engine
-	key := req.Method + "-" + req.RequestURI
-	if handler, ok := engine.router[key]; ok {
-		handler(context)
-	} else {
-		http.NotFound(w, req)
+
+	// 根据路径判断,这个请求是属于哪个组,然后获取这个组上的中间件.
+	// 把这些中间件放到上下文中.
+	for _, group := range engine.groups {
+		if strings.HasPrefix(req.URL.Path, group.basePath) {
+			context.handlers = append(context.handlers, group.Handlers...)
+		}
 	}
 
+	// 把请求处理器也作为"中间件"添加到上下文中.
+	key := req.Method + "-" + req.RequestURI
+	if handler, ok := engine.router[key]; ok {
+		context.handlers = append(context.handlers, handler)
+	} else {
+		context.handlers = append(context.handlers, func(ctx *Context) {
+			http.Error(ctx.Writer, "404 page not found", http.StatusInternalServerError)
+		})
+	}
+	context.Next()
 }
 
 // 向engine中添加handlerFunc
@@ -84,36 +113,4 @@ func (engine *Engine) Get(pattern string, handlerFunc HandlerFunc) {
 // Post 这个主要是为了区分GET 和POST的差异. 实际还是调用的 addRouter 方法.
 func (engine *Engine) Post(pattern string, handlerFunc HandlerFunc) {
 	engine.addRouter("POST", pattern, handlerFunc)
-}
-
-// RouterGroup 实现路由分组
-type RouterGroup struct {
-	basePath string
-	engine   *Engine
-}
-
-// RouterGroup 添加 router,实际也是 添加到容器里.
-func (group *RouterGroup) addRouter(method string, pattern string, handlerFunc HandlerFunc) {
-	if group.engine.router == nil {
-		group.engine.router = make(map[string]HandlerFunc)
-	}
-	pattern = group.basePath + pattern
-	key := method + "-" + pattern
-	group.engine.router[key] = handlerFunc
-}
-
-// Get 区分GET和POST请求.
-func (group *RouterGroup) Get(pattern string, handlerFunc HandlerFunc) {
-	group.addRouter("GET", pattern, handlerFunc)
-}
-func (group *RouterGroup) Post(pattern string, handlerFunc HandlerFunc) {
-	group.addRouter("POST", pattern, handlerFunc)
-}
-
-// Group 提供创建 RouterGroup 的函数Group
-func (group *RouterGroup) Group(relativePath string) *RouterGroup {
-	return &RouterGroup{
-		basePath: relativePath,
-		engine:   group.engine,
-	}
 }
