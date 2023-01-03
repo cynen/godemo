@@ -10,6 +10,8 @@ func main() {
 	//gindemo.TestWeb()
 
 	// 3.添加分组功能.
-	gindemo.TestGroup()
+	//gindemo.TestGroup()
 
+	// 4.测试Context
+	gindemo.TestContext()
 }
